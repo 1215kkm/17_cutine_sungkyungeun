@@ -66,7 +66,7 @@ export default function SalonPage() {
   );
 
   const handleCall = (phone: string) => {
-    window.location.href = `tel:${phone}`;
+    window.open(`tel:${phone}`, '_self');
   };
 
   const handleBook = (salon: Salon) => {

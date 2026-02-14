@@ -65,6 +65,7 @@ export function CutProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useCut() {
   const context = useContext(CutContext);
   if (!context) throw new Error('useCut must be used within CutProvider');
