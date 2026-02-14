@@ -1,4 +1,5 @@
-import { createContext, useContext, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useCallback } from 'react';
+import type { ReactNode } from 'react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { v4 as uuidv4 } from 'uuid';
 import type { CutRecord } from '../types';

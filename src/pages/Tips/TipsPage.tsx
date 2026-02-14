@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { tips } from '../../data/tips';
 import { products } from '../../data/products';
 import { useUser } from '../../context/UserContext';
@@ -33,7 +33,7 @@ export default function TipsPage() {
 
   // 팁 3개마다 제품 추천 1개 삽입
   const renderList = () => {
-    const items: JSX.Element[] = [];
+    const items: React.JSX.Element[] = [];
     let productIndex = 0;
 
     filteredTips.forEach((tip, i) => {
