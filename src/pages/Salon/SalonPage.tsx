@@ -1,8 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BannerAd from '../../components/Ad/BannerAd';
 import type { Salon } from '../../types';
 import styles from './SalonPage.module.css';
+
+declare global {
+  interface Window {
+    kakao: any;
+  }
+}
 
 // 데모 데이터 (실제 배포 시 카카오 로컬 API + Firestore 제휴 데이터로 교체)
 const demoSalons: Salon[] = [
@@ -54,6 +60,7 @@ const demoSalons: Salon[] = [
 
 export default function SalonPage() {
   const navigate = useNavigate();
+  const mapRef = useRef<HTMLDivElement>(null);
   const [salons] = useState<Salon[]>(
     [...demoSalons].sort((a, b) => {
       if (a.isPartner && !b.isPartner) return -1;
@@ -61,6 +68,32 @@ export default function SalonPage() {
       return (a.distance || 0) - (b.distance || 0);
     })
   );
+
+  useEffect(() => {
+    if (!mapRef.current || !window.kakao?.maps) return;
+
+    window.kakao.maps.load(() => {
+      const center = new window.kakao.maps.LatLng(37.5012, 127.0396);
+      const map = new window.kakao.maps.Map(mapRef.current, {
+        center,
+        level: 5,
+      });
+
+      salons.forEach((salon) => {
+        const marker = new window.kakao.maps.Marker({
+          position: new window.kakao.maps.LatLng(salon.lat, salon.lng),
+          map,
+        });
+
+        const infoContent = `<div style="padding:4px 8px;font-size:12px;white-space:nowrap;">${salon.name}${salon.isPartner ? ' <span style="color:#6C63FF;font-weight:700;">[제휴]</span>' : ''}</div>`;
+        const infowindow = new window.kakao.maps.InfoWindow({ content: infoContent });
+
+        window.kakao.maps.event.addListener(marker, 'click', () => {
+          infowindow.open(map, marker);
+        });
+      });
+    });
+  }, [salons]);
 
   const [bookingSalon, setBookingSalon] = useState<Salon | null>(null);
   const [bookingForm, setBookingForm] = useState({ name: '', phone: '', date: '', time: '', memo: '' });
@@ -109,9 +142,7 @@ export default function SalonPage() {
         <span className={styles.partnerBannerArrow}>&rarr;</span>
       </div>
 
-      <div className={styles.mapPlaceholder}>
-        &#128506; 카카오맵 영역 (API 키 설정 필요)
-      </div>
+      <div ref={mapRef} className={styles.mapContainer} />
 
       <BannerAd />
 
