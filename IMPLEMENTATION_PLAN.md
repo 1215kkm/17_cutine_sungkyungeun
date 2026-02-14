@@ -33,10 +33,11 @@
 | **라우팅** | React Router v6 | SPA 네비게이션 |
 | **스타일링** | CSS Modules + CSS Variables | 테마 지원, 스코프 격리 |
 | **상태 관리** | React Context + useReducer | 앱 규모에 적합, 외부 의존성 최소화 |
-| **데이터 저장** | LocalStorage (코어) + Supabase (확장) | 초기엔 서버 없이, 이후 동기화 확장 |
+| **백엔드/DB** | Firebase (Auth + Firestore + Hosting) | 서버리스, 실시간 동기화, 무료 티어 |
+| **데이터 저장** | Firestore + LocalStorage (캐시) | 클라우드 동기화 + 오프라인 지원 |
 | **지도/위치** | Kakao Maps API | 국내 미용실 검색에 최적화 |
 | **광고** | Google AdSense / Kakao AdFit | 국내 트래픽 수익화 |
-| **배포** | Vercel | 무료 티어, 자동 배포, HTTPS |
+| **배포** | Firebase Hosting | Firebase 통합, HTTPS, CDN |
 | **PWA** | vite-plugin-pwa | 오프라인 지원, 홈 화면 추가 |
 
 ---
@@ -104,8 +105,13 @@ cutine/
 │   │   ├── useGeolocation.ts     # 위치 정보 훅
 │   │   └── useLocalStorage.ts    # LocalStorage 래퍼
 │   │
+│   ├── firebase/                  # Firebase 설정
+│   │   ├── config.ts             # Firebase 초기화
+│   │   └── collections.ts       # Firestore 컬렉션 헬퍼
+│   │
 │   ├── services/                  # 외부 API 연동
 │   │   ├── salonApi.ts           # 미용실 검색 API
+│   │   ├── partnerApi.ts         # 제휴 신청 API (Firestore)
 │   │   ├── productApi.ts         # 제품 추천 데이터
 │   │   └── adService.ts          # 광고 로드/관리
 │   │
@@ -208,6 +214,40 @@ interface Tip {
 }
 ```
 
+### 4.6 제휴 신청 (PartnerApplication)
+
+```typescript
+interface PartnerApplication {
+  id: string;                    // Firestore 문서 ID
+  salonName: string;             // 미용실명
+  ownerName: string;             // 대표자명
+  phone: string;                 // 연락처
+  address: string;               // 미용실 주소
+  bookingUrl?: string;           // 네이버/카카오 예약 링크
+  message?: string;              // 추가 메시지
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: Timestamp;
+  reviewedAt?: Timestamp;
+}
+```
+
+### 4.7 Firebase Firestore 컬렉션 구조
+
+```
+firestore/
+├── users/{uid}/                  # 사용자별 데이터
+│   ├── profile                   # UserProfile
+│   └── cutRecords/{recordId}     # CutRecord (서브컬렉션)
+│
+├── partnerApplications/{id}      # 제휴 신청 목록
+│
+├── partnerSalons/{id}            # 승인된 제휴 미용실
+│
+├── products/{id}                 # 추천 제품 목록
+│
+└── tips/{id}                     # 헤어 팁 콘텐츠
+```
+
 ---
 
 ## 5. 화면별 상세 설계
@@ -293,7 +333,35 @@ interface Tip {
 - 예약 링크 클릭 시 제휴 트래킹
 - 비제휴 미용실도 기본 정보 표시 (카카오 로컬 API)
 
-### 5.7 설정 화면 (`/settings`)
+### 5.7 미용실 제휴 신청 화면 (`/salon/partner`) — 신규 추가
+
+미용실 사장님이 Cutine에 제휴를 신청할 수 있는 폼 화면입니다.
+
+**진입점:**
+- 미용실 화면 상단 배너: "미용실 사장님이신가요? 제휴 신청하기"
+- 설정 화면: "미용실 제휴 신청" 메뉴
+
+**폼 구성:**
+```
+[미용실명]          필수 텍스트
+[대표자명]          필수 텍스트
+[연락처]            필수 전화번호
+[미용실 주소]       필수 텍스트 (주소 검색)
+[예약 링크]         선택 URL (네이버/카카오 예약)
+[추가 메시지]       선택 텍스트
+[제출하기] 버튼
+```
+
+**처리 흐름:**
+```
+미용실 사장님 → 폼 작성 → Firestore에 저장 (status: pending)
+       ↓
+관리자 → Firebase Console에서 확인 → 승인/거절
+       ↓
+승인 시 → partnerSalons 컬렉션에 추가 → 앱에 자동 반영
+```
+
+### 5.8 설정 화면 (`/settings`)
 
 - **프로필 설정**: 닉네임, 머리 길이, 커트 주기
 - **알림 설정**: 알림 ON/OFF, 알림 시점 (D-3, D-1, D-Day)
@@ -322,7 +390,7 @@ interface Tip {
 
 **구현 방식:**
 - **카카오 로컬 API** → 키워드 "미용실"로 주변 검색
-- 제휴 미용실 데이터는 별도 JSON 또는 Supabase 관리
+- 제휴 미용실 데이터는 Firestore `partnerSalons` 컬렉션으로 관리
 - 예약 링크에 UTM 파라미터 추가하여 트래킹
 - 초기엔 네이버 예약 링크로 연결, 이후 자체 제휴 확대
 
@@ -505,7 +573,30 @@ function trackAffiliateClick(type: 'salon' | 'product', itemId: string) {
   });
   localStorage.setItem('affiliate_clicks', JSON.stringify(clicks));
 
-  // 향후 서버 전송 확장 가능
+  // Firebase Analytics로 전송
+  logEvent(analytics, 'affiliate_click', { type, itemId });
+}
+```
+
+### 9.4 미용실 제휴 신청 (Firestore)
+
+```typescript
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+
+async function submitPartnerApplication(data: {
+  salonName: string;
+  ownerName: string;
+  phone: string;
+  address: string;
+  bookingUrl?: string;
+  message?: string;
+}) {
+  const docRef = await addDoc(collection(db, 'partnerApplications'), {
+    ...data,
+    status: 'pending',
+    createdAt: serverTimestamp(),
+  });
+  return docRef.id;
 }
 ```
 
@@ -519,7 +610,7 @@ function trackAffiliateClick(type: 'salon' | 'product', itemId: string) {
 | Kakao Local API | 미용실 검색 | developers.kakao.com |
 | Kakao AdFit | 배너 광고 | adfit.kakao.com |
 | 쿠팡 파트너스 | 제품 제휴 링크 | partners.coupang.com |
-| Vercel | 배포 | vercel.com |
+| Firebase | Auth + Firestore + Hosting | firebase.google.com |
 
 ---
 
