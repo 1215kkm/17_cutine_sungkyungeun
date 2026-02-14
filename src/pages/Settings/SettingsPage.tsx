@@ -127,6 +127,14 @@ export default function SettingsPage() {
           <span className={styles.itemArrow}>&gt;</span>
         </button>
 
+        <button className={styles.item} onClick={() => navigate('/admin')}>
+          <div className={styles.itemLeft}>
+            <span className={styles.itemIcon}>&#128736;</span>
+            <span className={styles.itemLabel}>관리자 페이지</span>
+          </div>
+          <span className={styles.itemArrow}>&gt;</span>
+        </button>
+
         <div className={styles.item}>
           <div className={styles.itemLeft}>
             <span className={styles.itemIcon}>&#128172;</span>

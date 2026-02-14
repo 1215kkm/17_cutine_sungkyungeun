@@ -10,6 +10,7 @@ import TipsPage from './pages/Tips/TipsPage';
 import SalonPage from './pages/Salon/SalonPage';
 import PartnerPage from './pages/Salon/PartnerPage';
 import SettingsPage from './pages/Settings/SettingsPage';
+import AdminPage from './pages/Admin/AdminPage';
 
 function AppRoutes() {
   return (
@@ -22,6 +23,7 @@ function AppRoutes() {
       <Route path="/salon" element={<PageLayout><SalonPage /></PageLayout>} />
       <Route path="/salon/partner" element={<PartnerPage />} />
       <Route path="/settings" element={<PageLayout><SettingsPage /></PageLayout>} />
+      <Route path="/admin" element={<AdminPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

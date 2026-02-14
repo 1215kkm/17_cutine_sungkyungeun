@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../../context/UserContext';
 import { useCut } from '../../context/CutContext';
@@ -8,12 +8,62 @@ import styles from './MainPage.module.css';
 
 export default function MainPage() {
   const navigate = useNavigate();
-  const { profile } = useUser();
+  const { profile, isOnboarded } = useUser();
   const { lastCutDate, addRecord, averageCycle, records } = useCut();
   const [showDateModal, setShowDateModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(toDateString(new Date()));
 
-  if (!profile || !lastCutDate) return null;
+  useEffect(() => {
+    if (!isOnboarded) {
+      navigate('/onboarding', { replace: true });
+    }
+  }, [isOnboarded, navigate]);
+
+  if (!profile) return null;
+
+  // 아직 커트 기록이 없는 경우 첫 기록 유도
+  if (!lastCutDate) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.header}>
+          <div>
+            <div className={styles.greeting}>{profile.nickname}님</div>
+            <div className={styles.greetingSub}>오늘도 좋은 하루 되세요</div>
+          </div>
+        </div>
+        <div className={styles.ddayCard}>
+          <div className={styles.character}>&#9986;</div>
+          <div className={styles.ddayMessage}>첫 커트 기록을 남겨보세요!</div>
+        </div>
+        <button className={styles.cutButton} onClick={() => {
+          addRecord(toDateString(new Date()));
+        }}>
+          &#9986; 오늘 커트했어요
+        </button>
+        <button className={styles.otherDateBtn} onClick={() => setShowDateModal(true)}>
+          다른 날짜에 했어요
+        </button>
+        {showDateModal && (
+          <div className={styles.modal} onClick={() => setShowDateModal(false)}>
+            <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
+              <h3 className={styles.modalTitle}>커트한 날짜 선택</h3>
+              <input
+                className={styles.modalDateInput}
+                type="date"
+                value={selectedDate}
+                onChange={e => setSelectedDate(e.target.value)}
+                max={toDateString(new Date())}
+              />
+              <div className={styles.modalActions}>
+                <button className={styles.modalCancel} onClick={() => setShowDateModal(false)}>취소</button>
+                <button className={styles.modalConfirm} onClick={() => { addRecord(selectedDate); setShowDateModal(false); }}>기록하기</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const dday = calculateDday(lastCutDate, profile.cutCycleDays);
   const status = getDdayStatus(dday);

@@ -15,7 +15,6 @@ const demoSalons: Salon[] = [
     lng: 127.0276,
     distance: 350,
     rating: 4.5,
-    bookingUrl: '#',
     isPartner: true,
   },
   {
@@ -38,7 +37,6 @@ const demoSalons: Salon[] = [
     lng: 127.0396,
     distance: 1200,
     rating: 4.7,
-    bookingUrl: '#',
     isPartner: true,
   },
   {
@@ -57,7 +55,6 @@ const demoSalons: Salon[] = [
 export default function SalonPage() {
   const navigate = useNavigate();
   const [salons] = useState<Salon[]>(
-    // 제휴 미용실 우선 정렬
     [...demoSalons].sort((a, b) => {
       if (a.isPartner && !b.isPartner) return -1;
       if (!a.isPartner && b.isPartner) return 1;
@@ -65,24 +62,39 @@ export default function SalonPage() {
     })
   );
 
+  const [bookingSalon, setBookingSalon] = useState<Salon | null>(null);
+  const [bookingForm, setBookingForm] = useState({ name: '', phone: '', date: '', time: '', memo: '' });
+  const [bookingSubmitted, setBookingSubmitted] = useState(false);
+
   const handleCall = (phone: string) => {
     window.open(`tel:${phone}`, '_self');
   };
 
-  const handleBook = (salon: Salon) => {
-    // 제휴 트래킹
+  const handleBookClick = (salon: Salon) => {
     const clicks = JSON.parse(localStorage.getItem('affiliate_clicks') || '[]');
-    clicks.push({
-      type: 'salon',
-      itemId: salon.id,
-      timestamp: new Date().toISOString(),
-    });
+    clicks.push({ type: 'salon', itemId: salon.id, timestamp: new Date().toISOString() });
     localStorage.setItem('affiliate_clicks', JSON.stringify(clicks));
-
-    if (salon.bookingUrl && salon.bookingUrl !== '#') {
-      window.open(salon.bookingUrl, '_blank', 'noopener');
-    }
+    setBookingSalon(salon);
+    setBookingForm({ name: '', phone: '', date: '', time: '', memo: '' });
+    setBookingSubmitted(false);
   };
+
+  const handleBookingSubmit = () => {
+    if (!bookingSalon) return;
+    const reservations = JSON.parse(localStorage.getItem('cutine_reservations') || '[]');
+    reservations.push({
+      id: `res_${Date.now()}`,
+      salonId: bookingSalon.id,
+      salonName: bookingSalon.name,
+      ...bookingForm,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    });
+    localStorage.setItem('cutine_reservations', JSON.stringify(reservations));
+    setBookingSubmitted(true);
+  };
+
+  const isBookingValid = bookingForm.name && bookingForm.phone && bookingForm.date && bookingForm.time;
 
   return (
     <div className={styles.container}>
@@ -98,7 +110,6 @@ export default function SalonPage() {
       </div>
 
       <div className={styles.mapPlaceholder}>
-        {/* 실제 배포 시 카카오맵 SDK로 교체 */}
         &#128506; 카카오맵 영역 (API 키 설정 필요)
       </div>
 
@@ -118,15 +129,97 @@ export default function SalonPage() {
               <button className={styles.btnCall} onClick={() => handleCall(salon.phone)}>
                 &#128222; 전화
               </button>
-              {salon.bookingUrl && (
-                <button className={styles.btnBook} onClick={() => handleBook(salon)}>
-                  예약하기
-                </button>
-              )}
+              <button className={styles.btnBook} onClick={() => handleBookClick(salon)}>
+                예약하기
+              </button>
             </div>
           </div>
         ))}
       </div>
+
+      {bookingSalon && (
+        <div className={styles.bookingModal} onClick={() => setBookingSalon(null)}>
+          <div className={styles.bookingModalContent} onClick={e => e.stopPropagation()}>
+            {bookingSubmitted ? (
+              <div className={styles.bookingSuccess}>
+                <div className={styles.bookingSuccessIcon}>&#9989;</div>
+                <h3 className={styles.bookingSuccessTitle}>예약 신청 완료!</h3>
+                <p className={styles.bookingSuccessDesc}>
+                  <strong>{bookingSalon.name}</strong>에<br />
+                  예약 신청이 접수되었습니다.<br />
+                  미용실에서 확인 후 연락드립니다.
+                </p>
+                <button className={styles.bookingCloseBtn} onClick={() => setBookingSalon(null)}>
+                  닫기
+                </button>
+              </div>
+            ) : (
+              <>
+                <h3 className={styles.bookingModalTitle}>
+                  {bookingSalon.name} 예약
+                </h3>
+                <div className={styles.bookingField}>
+                  <label className={styles.bookingLabel}>이름 <span className={styles.bookingRequired}>*</span></label>
+                  <input
+                    className={styles.bookingInput}
+                    placeholder="홍길동"
+                    value={bookingForm.name}
+                    onChange={e => setBookingForm(p => ({ ...p, name: e.target.value }))}
+                  />
+                </div>
+                <div className={styles.bookingField}>
+                  <label className={styles.bookingLabel}>연락처 <span className={styles.bookingRequired}>*</span></label>
+                  <input
+                    className={styles.bookingInput}
+                    type="tel"
+                    placeholder="010-0000-0000"
+                    value={bookingForm.phone}
+                    onChange={e => setBookingForm(p => ({ ...p, phone: e.target.value }))}
+                  />
+                </div>
+                <div className={styles.bookingField}>
+                  <label className={styles.bookingLabel}>날짜 <span className={styles.bookingRequired}>*</span></label>
+                  <input
+                    className={styles.bookingInput}
+                    type="date"
+                    value={bookingForm.date}
+                    min={new Date().toISOString().split('T')[0]}
+                    onChange={e => setBookingForm(p => ({ ...p, date: e.target.value }))}
+                  />
+                </div>
+                <div className={styles.bookingField}>
+                  <label className={styles.bookingLabel}>시간 <span className={styles.bookingRequired}>*</span></label>
+                  <input
+                    className={styles.bookingInput}
+                    type="time"
+                    value={bookingForm.time}
+                    onChange={e => setBookingForm(p => ({ ...p, time: e.target.value }))}
+                  />
+                </div>
+                <div className={styles.bookingField}>
+                  <label className={styles.bookingLabel}>요청사항 (선택)</label>
+                  <textarea
+                    className={styles.bookingTextarea}
+                    placeholder="원하는 스타일, 담당 디자이너 등"
+                    value={bookingForm.memo}
+                    onChange={e => setBookingForm(p => ({ ...p, memo: e.target.value }))}
+                  />
+                </div>
+                <div className={styles.bookingActions}>
+                  <button className={styles.bookingCancelBtn} onClick={() => setBookingSalon(null)}>취소</button>
+                  <button
+                    className={styles.bookingSubmitBtn}
+                    disabled={!isBookingValid}
+                    onClick={handleBookingSubmit}
+                  >
+                    예약 신청
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
