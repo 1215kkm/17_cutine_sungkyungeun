@@ -70,9 +70,10 @@ export default function SalonPage() {
   );
 
   useEffect(() => {
-    if (!mapRef.current || !window.kakao?.maps) return;
+    if (!mapRef.current) return;
 
-    window.kakao.maps.load(() => {
+    const initMap = () => {
+      if (!mapRef.current) return;
       const center = new window.kakao.maps.LatLng(37.5012, 127.0396);
       const map = new window.kakao.maps.Map(mapRef.current, {
         center,
@@ -92,7 +93,23 @@ export default function SalonPage() {
           infowindow.open(map, marker);
         });
       });
-    });
+    };
+
+    // SDK가 이미 로드된 경우
+    if (window.kakao?.maps) {
+      window.kakao.maps.load(initMap);
+      return;
+    }
+
+    // SDK가 아직 로드되지 않은 경우 대기
+    const checkKakao = setInterval(() => {
+      if (window.kakao?.maps) {
+        clearInterval(checkKakao);
+        window.kakao.maps.load(initMap);
+      }
+    }, 300);
+
+    return () => clearInterval(checkKakao);
   }, [salons]);
 
   const [bookingSalon, setBookingSalon] = useState<Salon | null>(null);
